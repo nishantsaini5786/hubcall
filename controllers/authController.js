@@ -359,3 +359,125 @@ exports.verifyToken = async (req, res, next) => {
         });
     }
 };
+// ========================= RESET PASSWORD =========================
+exports.resetPassword = async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+        
+        // Verify token
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.userId);
+        
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "Invalid or expired token"
+            });
+        }
+        
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+        
+        return res.status(200).json({
+            success: true,
+            message: "Password reset successfully"
+        });
+        
+    } catch (error) {
+        console.error("Reset Password Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+};
+
+// ========================= UPDATE PROFILE =========================
+exports.updateProfile = async (req, res) => {
+    try {
+        const updates = req.body;
+        const allowedUpdates = ['firstName', 'lastName', 'age', 'profilePicture'];
+        const isValidUpdate = Object.keys(updates).every(key => allowedUpdates.includes(key));
+        
+        if (!isValidUpdate) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid updates"
+            });
+        }
+        
+        const user = await User.findByIdAndUpdate(
+            req.userId,
+            updates,
+            { new: true, runValidators: true }
+        ).select('-password');
+        
+        return res.status(200).json({
+            success: true,
+            message: "Profile updated successfully",
+            user
+        });
+        
+    } catch (error) {
+        console.error("Update Profile Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+};
+
+// ========================= CHANGE PASSWORD =========================
+exports.changePassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        
+        const user = await User.findById(req.userId).select('+password');
+        
+        // Check current password
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(401).json({
+                success: false,
+                message: "Current password is incorrect"
+            });
+        }
+        
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+        
+        return res.status(200).json({
+            success: true,
+            message: "Password changed successfully"
+        });
+        
+    } catch (error) {
+        console.error("Change Password Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+};
+
+// ========================= LOGOUT =========================
+exports.logout = async (req, res) => {
+    try {
+        // In a stateless JWT system, logout is handled on client side
+        return res.status(200).json({
+            success: true,
+            message: "Logged out successfully"
+        });
+        
+    } catch (error) {
+        console.error("Logout Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+};
