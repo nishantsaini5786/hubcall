@@ -2,21 +2,12 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-// ========================= REGISTER =========================
+// ==================== REGISTER USER ====================
 exports.register = async (req, res) => {
-    const {
-        firstName,
-        lastName,
-        email,
-        mobile,
-        age,
-        password,
-        confirmPassword,
-        termsAccepted
-    } = req.body;
-
     try {
-        // Validation checks
+        const { firstName, lastName, email, mobile, age, password, confirmPassword, termsAccepted } = req.body;
+
+        // Basic validation
         if (!firstName || !lastName || !email || !mobile || !age || !password || !confirmPassword) {
             return res.status(400).json({
                 success: false,
@@ -24,42 +15,13 @@ exports.register = async (req, res) => {
             });
         }
 
-        // Terms acceptance check
-        if (!termsAccepted) {
+        if (!termsAccepted || termsAccepted !== "true") {
             return res.status(400).json({
                 success: false,
                 message: "You must accept terms and conditions"
             });
         }
 
-        // Age validation
-        if (age < 13) {
-            return res.status(400).json({
-                success: false,
-                message: "You must be at least 13 years old"
-            });
-        }
-
-        // Email format validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            return res.status(400).json({
-                success: false,
-                message: "Please enter a valid email address"
-            });
-        }
-
-        // Mobile validation
-        const mobileRegex = /^\d{10}$/;
-        const cleanMobile = mobile.replace(/\D/g, '');
-        if (!mobileRegex.test(cleanMobile)) {
-            return res.status(400).json({
-                success: false,
-                message: "Please enter a valid 10-digit mobile number"
-            });
-        }
-
-        // Password validation
         if (password.length < 8) {
             return res.status(400).json({
                 success: false,
@@ -67,7 +29,6 @@ exports.register = async (req, res) => {
             });
         }
 
-        // Password confirmation
         if (password !== confirmPassword) {
             return res.status(400).json({
                 success: false,
@@ -75,7 +36,14 @@ exports.register = async (req, res) => {
             });
         }
 
-        // Check if email already exists
+        if (age < 13 || age > 120) {
+            return res.status(400).json({
+                success: false,
+                message: "Age must be between 13 and 120"
+            });
+        }
+
+        // Check if user exists
         const existingUser = await User.findOne({ email: email.toLowerCase() });
         if (existingUser) {
             return res.status(409).json({
@@ -84,12 +52,12 @@ exports.register = async (req, res) => {
             });
         }
 
-        // Check if mobile already exists
-        const existingMobile = await User.findOne({ mobile: cleanMobile });
-        if (existingMobile) {
-            return res.status(409).json({
+        // Check mobile number
+        const cleanMobile = mobile.replace(/\D/g, '');
+        if (cleanMobile.length !== 10) {
+            return res.status(400).json({
                 success: false,
-                message: "Mobile number already registered"
+                message: "Mobile number must be 10 digits"
             });
         }
 
@@ -108,20 +76,27 @@ exports.register = async (req, res) => {
             termsAccepted: true
         });
 
-        // Create JWT token
+        // Generate JWT token
         const token = jwt.sign(
-            { userId: user._id },
+            { userId: user._id, email: user.email },
             process.env.JWT_SECRET,
             { expiresIn: "7d" }
         );
 
-        // Remove password from response
-        const userResponse = user.toObject();
-        delete userResponse.password;
+        // Prepare user response
+        const userResponse = {
+            _id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            mobile: user.mobile,
+            age: user.age,
+            createdAt: user.createdAt
+        };
 
         return res.status(201).json({
             success: true,
-            message: "User registered successfully",
+            message: "🎉 User registered successfully",
             token,
             user: userResponse
         });
@@ -133,13 +108,13 @@ exports.register = async (req, res) => {
         if (error.code === 11000) {
             return res.status(409).json({
                 success: false,
-                message: "Email or mobile already exists"
+                message: "Email already exists"
             });
         }
 
         // Handle validation errors
         if (error.name === 'ValidationError') {
-            const messages = Object.values(error.errors).map(val => val.message);
+            const messages = Object.values(error.errors).map(err => err.message);
             return res.status(400).json({
                 success: false,
                 message: messages.join(', ')
@@ -148,16 +123,16 @@ exports.register = async (req, res) => {
 
         return res.status(500).json({
             success: false,
-            message: "Server error. Please try again later."
+            message: "Server error. Please try again."
         });
     }
 };
 
-// ========================= LOGIN =========================
+// ==================== LOGIN USER ====================
 exports.login = async (req, res) => {
-    const { email, password } = req.body;
-
     try {
+        const { email, password } = req.body;
+
         // Validation
         if (!email || !password) {
             return res.status(400).json({
@@ -168,7 +143,6 @@ exports.login = async (req, res) => {
 
         // Find user
         const user = await User.findOne({ email: email.toLowerCase().trim() });
-        
         if (!user) {
             return res.status(401).json({
                 success: false,
@@ -178,7 +152,6 @@ exports.login = async (req, res) => {
 
         // Check password
         const isPasswordValid = await bcrypt.compare(password, user.password);
-        
         if (!isPasswordValid) {
             return res.status(401).json({
                 success: false,
@@ -186,20 +159,27 @@ exports.login = async (req, res) => {
             });
         }
 
-        // Create token
+        // Generate token
         const token = jwt.sign(
-            { userId: user._id },
+            { userId: user._id, email: user.email },
             process.env.JWT_SECRET,
             { expiresIn: "7d" }
         );
 
-        // Remove password from response
-        const userResponse = user.toObject();
-        delete userResponse.password;
+        // Prepare response
+        const userResponse = {
+            _id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            mobile: user.mobile,
+            age: user.age,
+            createdAt: user.createdAt
+        };
 
         return res.status(200).json({
             success: true,
-            message: "Login successful",
+            message: "🔓 Login successful",
             token,
             user: userResponse
         });
@@ -208,12 +188,12 @@ exports.login = async (req, res) => {
         console.error("Login Error:", error);
         return res.status(500).json({
             success: false,
-            message: "Server error. Please try again later."
+            message: "Server error. Please try again."
         });
     }
 };
 
-// ========================= CHECK EMAIL =========================
+// ==================== CHECK EMAIL ====================
 exports.checkEmail = async (req, res) => {
     try {
         const { email } = req.params;
@@ -230,7 +210,7 @@ exports.checkEmail = async (req, res) => {
         return res.status(200).json({
             success: true,
             exists: !!user,
-            message: user ? "Email already registered" : "Email available"
+            message: user ? "Email already registered" : "Email is available"
         });
 
     } catch (error) {
@@ -242,7 +222,7 @@ exports.checkEmail = async (req, res) => {
     }
 };
 
-// ========================= GET USER PROFILE =========================
+// ==================== GET PROFILE ====================
 exports.getProfile = async (req, res) => {
     try {
         const user = await User.findById(req.userId).select('-password');
@@ -268,7 +248,7 @@ exports.getProfile = async (req, res) => {
     }
 };
 
-// ========================= FORGOT PASSWORD =========================
+// ==================== FORGOT PASSWORD ====================
 exports.forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
@@ -289,9 +269,9 @@ exports.forgotPassword = async (req, res) => {
             });
         }
 
-        // Generate reset token
+        // Generate reset token (1 hour expiry)
         const resetToken = jwt.sign(
-            { userId: user._id },
+            { userId: user._id, purpose: 'password_reset' },
             process.env.JWT_SECRET,
             { expiresIn: "1h" }
         );
@@ -299,7 +279,7 @@ exports.forgotPassword = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: "Password reset email sent",
-            resetToken
+            resetToken: resetToken
         });
 
     } catch (error) {
@@ -311,10 +291,19 @@ exports.forgotPassword = async (req, res) => {
     }
 };
 
-// ========================= VALIDATE TOKEN MIDDLEWARE =========================
+// ==================== VERIFY TOKEN ====================
 exports.verifyToken = async (req, res, next) => {
     try {
-        const token = req.header('Authorization')?.replace('Bearer ', '');
+        const authHeader = req.header('Authorization');
+        
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({
+                success: false,
+                message: "Access denied. No token provided."
+            });
+        }
+
+        const token = authHeader.replace('Bearer ', '');
         
         if (!token) {
             return res.status(401).json({
@@ -337,19 +326,16 @@ exports.verifyToken = async (req, res, next) => {
             });
         }
         
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid token."
+            });
+        }
+        
         return res.status(401).json({
             success: false,
-            message: "Invalid token"
+            message: "Authentication failed."
         });
     }
-};
-
-// ========================= EXPORTS =========================
-module.exports = {
-    register: exports.register,
-    login: exports.login,
-    checkEmail: exports.checkEmail,
-    getProfile: exports.getProfile,
-    forgotPassword: exports.forgotPassword,
-    verifyToken: exports.verifyToken
 };

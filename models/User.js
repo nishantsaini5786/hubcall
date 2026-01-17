@@ -27,20 +27,19 @@ const UserSchema = new mongoose.Schema({
             validator: function(v) {
                 return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
             },
-            message: props => `${props.value} is not a valid email address!`
+            message: "Please enter a valid email address"
         }
     },
     
     mobile: {
         type: String,
         required: [true, "Mobile number is required"],
-        unique: true,
         trim: true,
         validate: {
             validator: function(v) {
                 return /^\d{10}$/.test(v);
             },
-            message: props => `${props.value} is not a valid 10-digit mobile number!`
+            message: "Mobile number must be 10 digits"
         }
     },
     
@@ -53,13 +52,20 @@ const UserSchema = new mongoose.Schema({
     
     password: {
         type: String,
-        required: [true, "Password is required"]
+        required: [true, "Password is required"],
+        minlength: [8, "Password must be at least 8 characters"]
     },
     
     termsAccepted: {
         type: Boolean,
         required: [true, "You must accept terms and conditions"],
-        default: false
+        default: false,
+        validate: {
+            validator: function(v) {
+                return v === true;
+            },
+            message: "You must accept terms and conditions"
+        }
     }
 
 }, { 
@@ -73,9 +79,8 @@ const UserSchema = new mongoose.Schema({
     }
 });
 
-// Remove duplicate mobile index - ONLY keep email index
+// Index for faster email queries
 UserSchema.index({ email: 1 });
 
 const User = mongoose.model("User", UserSchema);
-
 module.exports = User;

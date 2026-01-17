@@ -9,8 +9,10 @@ const {
     verifyToken
 } = require("../controllers/authController");
 
-// Validation middleware
+// Import validation
 const { body, param, validationResult } = require('express-validator');
+
+// Validation middleware
 const validateRequest = (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -27,16 +29,23 @@ const validateRequest = (req, res, next) => {
 
 // ==================== PUBLIC ROUTES ====================
 
-// Test route
+// API Info
 router.get("/", (req, res) => {
     res.json({ 
         success: true, 
         message: "🔐 HUB CALL Authentication API", 
-        version: "1.0.0"
+        version: "1.0.0",
+        endpoints: {
+            register: "POST /register",
+            login: "POST /login",
+            checkEmail: "GET /check-email/:email",
+            profile: "GET /profile (protected)",
+            forgotPassword: "POST /forgot-password"
+        }
     });
 });
 
-// Register route with validation
+// Register
 router.post("/register", 
     [
         body('firstName')
@@ -80,7 +89,7 @@ router.post("/register",
     register
 );
 
-// Login route with validation
+// Login
 router.post("/login",
     [
         body('email')
@@ -131,7 +140,7 @@ router.get("/profile", verifyToken, getProfile);
 router.get("/health", (req, res) => {
     res.status(200).json({
         success: true,
-        message: "Auth service is healthy",
+        message: "✅ Auth service is healthy",
         timestamp: new Date().toISOString()
     });
 });
