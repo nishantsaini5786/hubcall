@@ -346,10 +346,10 @@ exports.verifyToken = async (req, res, next) => {
 
 // ========================= EXPORTS =========================
 module.exports = {
-    register,
-    login,
-    checkEmail,
-    getProfile,
-    forgotPassword,
-    verifyToken
+    register: exports.register,
+    login: exports.login,
+    checkEmail: exports.checkEmail,
+    getProfile: exports.getProfile,
+    forgotPassword: exports.forgotPassword,
+    verifyToken: exports.verifyToken
 };
